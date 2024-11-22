@@ -84,3 +84,58 @@
     (ok new-proposal-id)
   )
 )
+
+(define-public (vote (proposal-id uint) (vote-for bool))
+  (let
+    (
+      (proposal (unwrap! (map-get? proposals { proposal-id: proposal-id }) err-not-found))
+      (voter-info (unwrap! (map-get? donors { donor: tx-sender }) err-unauthorized))
+      (voting-power (get voting-power voter-info))
+    )
+    (asserts! (get is-active proposal) err-proposal-ended)
+    (asserts! (<= block-height (get end-block proposal)) err-proposal-ended)
+    (asserts! (is-none (map-get? votes { proposal-id: proposal-id, voter: tx-sender })) err-already-voted)
+    (map-set votes { proposal-id: proposal-id, voter: tx-sender } { amount: voting-power })
+    (if vote-for
+      (map-set proposals { proposal-id: proposal-id }
+        (merge proposal { votes-for: (+ (get votes-for proposal) voting-power) }))
+      (map-set proposals { proposal-id: proposal-id }
+        (merge proposal { votes-against: (+ (get votes-against proposal) voting-power) }))
+    )
+    (ok true)
+  )
+)
+
+(define-public (execute-proposal (proposal-id uint))
+  (let
+    (
+      (proposal (unwrap! (map-get? proposals { proposal-id: proposal-id }) err-not-found))
+    )
+    (asserts! (not (get is-executed proposal)) err-proposal-ended)
+    (asserts! (> block-height (get end-block proposal)) err-proposal-active)
+    (asserts! (> (get votes-for proposal) (get votes-against proposal)) err-unauthorized)
+    (asserts! (>= (var-get charity-balance) (get amount proposal)) err-insufficient-funds)
+    (try! (as-contract (stx-transfer? (get amount proposal) tx-sender (get beneficiary proposal))))
+    (var-set charity-balance (- (var-get charity-balance) (get amount proposal)))
+    (ok (map-set proposals { proposal-id: proposal-id }
+      (merge proposal { is-active: false, is-executed: true })))
+  )
+)
+
+;; Read-only Functions
+(define-read-only (get-donor-info (donor principal))
+  (map-get? donors { donor: donor })
+)
+
+(define-read-only (get-proposal (proposal-id uint))
+  (map-get? proposals { proposal-id: proposal-id })
+)
+
+(define-read-only (get-charity-balance)
+  (var-get charity-balance)
+)
+
+(define-read-only (get-vote (proposal-id uint) (voter principal))
+  (map-get? votes { proposal-id: proposal-id, voter: voter })
+)
+
