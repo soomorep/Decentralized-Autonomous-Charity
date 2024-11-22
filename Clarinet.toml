@@ -1,0 +1,24 @@
+[project]
+name = 'Decentralized-Autonomous-Charity'
+description = ''
+authors = []
+telemetry = true
+cache_dir = './.cache'
+requirements = []
+[contracts.decentralized-charity]
+path = 'contracts/decentralized-charity.clar'
+clarity_version = 2
+epoch = 2.5
+
+[contracts.reputation]
+path = 'contracts/reputation.clar'
+clarity_version = 2
+epoch = 2.5
+[repl.analysis]
+passes = ['check_checker']
+
+[repl.analysis.check_checker]
+strict = false
+trusted_sender = false
+trusted_caller = false
+callee_filter = false
